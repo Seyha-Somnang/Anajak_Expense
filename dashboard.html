@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Anajak Expense</title>
+    <link rel="stylesheet" href="./css/output.css" />
+    <link rel="stylesheet" href="./css/component.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+  </head>
+  <body class="bg-slate-50 min-h-screen text-slate-900">
+    <main class="p-4 md:p-8 max-w-7xl mx-auto">
+      <!-- Header Section -->
+      <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 class="text-2xl font-bold text-slate-800">Expense Overview</h1>
+          <p class="text-slate-500 text-sm">Manage your spending and scan receipts with ANAJAK.</p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <button
+            onclick="toggleBudgetModal()"
+            class="bg-white border border-slate-200 text-slate-700 px-6 py-3 rounded-2xl font-medium transition-all hover:bg-slate-50 flex items-center justify-center gap-2">
+            <i class="fas fa-edit"></i> Set Budget
+          </button>
+          <button
+            onclick="openAddModal()"
+            class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-medium transition-all shadow-lg shadow-indigo-200 flex items-center justify-center gap-2">
+            <i class="fas fa-plus"></i> Add Transaction
+          </button>
+          <button
+            onclick="handleLogout()"
+            class="bg-rose-50 border border-rose-100 text-rose-600 px-6 py-3 rounded-2xl font-medium transition-all hover:bg-rose-100 flex items-center justify-center gap-2">
+            <i class="fas fa-sign-out-alt"></i> Logout
+          </button>
+        </div>
+      </header>
+
+      <!-- Stats Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="glass-card p-6 rounded-3xl shadow-sm">
+          <div class="flex items-center gap-4 mb-4">
+            <div class="p-3 bg-emerald-100 text-emerald-600 rounded-2xl"><i class="fas fa-arrow-up"></i></div>
+            <span class="text-slate-500 font-medium">Monthly Budget</span>
+          </div>
+          <div class="text-3xl font-bold" id="monthlyBudgetText">$0.00</div>
+          <div class="mt-2 text-xs text-slate-400 font-semibold" id="remainingBudgetText">Remaining: $0.00</div>
+        </div>
+
+        <div class="glass-card p-6 rounded-3xl shadow-sm">
+          <div class="flex items-center gap-4 mb-4">
+            <div class="p-3 bg-rose-100 text-rose-600 rounded-2xl"><i class="fas fa-arrow-down"></i></div>
+            <span class="text-slate-500 font-medium">Spent This Month</span>
+          </div>
+          <div class="text-3xl font-bold text-rose-600" id="totalSpentText">$0.00</div>
+          <div class="mt-2 text-xs text-rose-500 font-semibold">Updated Live</div>
+        </div>
+
+        <div class="glass-card p-6 rounded-3xl shadow-sm">
+          <div class="flex items-center gap-4 mb-4">
+            <div class="p-3 bg-amber-100 text-amber-600 rounded-2xl"><i class="fas fa-tag"></i></div>
+            <span class="text-slate-500 font-medium">Top Category</span>
+          </div>
+          <div class="text-3xl font-bold" id="topCategoryText">None</div>
+          <div class="mt-2 text-xs text-slate-400 font-semibold">Most frequent spending</div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="lg:col-span-2 glass-card p-6 rounded-3xl shadow-sm">
+          <h3 class="font-bold text-lg mb-6">Spending Trends</h3>
+          <div class="h-64">
+            <canvas id="expenseChart"></canvas>
+          </div>
+        </div>
+
+        <div class="glass-card p-6 rounded-3xl shadow-sm">
+          <h3 class="font-bold text-lg mb-6 text-slate-800">By Category</h3>
+          <div class="space-y-6" id="categoryBreakdown"></div>
+        </div>
+
+        <div class="lg:col-span-3 glass-card p-6 rounded-3xl shadow-sm">
+          <h3 class="font-bold text-lg mb-6 text-slate-800">Recent Transactions</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left">
+              <thead>
+                <tr class="text-slate-400 text-xs uppercase border-b border-slate-100">
+                  <th class="pb-4">Description</th>
+                  <th class="pb-4">Category</th>
+                  <th class="pb-4">Date</th>
+                  <th class="pb-4 text-right">Amount</th>
+                  <th class="pb-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="transactionList" class="divide-y divide-slate-50"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Unified Modal (Transaction) -->
+    <div
+      id="modal"
+      class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+      <div class="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl scale-in overflow-hidden relative">
+        <div
+          id="aiLoader"
+          class="hidden absolute inset-0 bg-white/95 z-10 flex flex-col items-center justify-center p-6 text-center">
+          <div class="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center mb-4 animate-bounce">
+            <i class="fas fa-robot text-white text-2xl"></i>
+          </div>
+          <h3 class="text-lg font-bold text-slate-800">AI Scanning Receipt...</h3>
+          <p class="text-sm text-slate-500">Extracting details automatically</p>
+        </div>
+
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-bold" id="modalTitle">New Expense</h2>
+          <button onclick="toggleModal()" class="text-slate-400 hover:text-slate-600">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <div
+          id="aiScanContainer"
+          class="mb-6 p-4 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="p-2 bg-indigo-600 text-white rounded-lg"><i class="fas fa-magic"></i></div>
+            <div>
+              <div class="text-sm font-bold text-indigo-900">AI Quick Scan</div>
+              <div class="text-[10px] text-indigo-600 uppercase font-bold">Upload Receipt</div>
+            </div>
+          </div>
+          <input type="file" id="aiInput" accept="image/*" class="hidden" onchange="handleAIScan(this)" />
+          <label
+            for="aiInput"
+            class="cursor-pointer bg-white text-indigo-600 px-4 py-2 rounded-xl text-xs font-bold shadow-sm border border-indigo-200 hover:bg-indigo-50 transition-colors">
+            Choose File
+          </label>
+        </div>
+
+        <div
+          id="aiErrorMessage"
+          class="hidden mb-4 p-3 bg-rose-50 text-rose-600 text-xs rounded-xl border border-rose-100"></div>
+
+        <form id="expenseForm" class="space-y-4">
+          <input type="hidden" id="editId" />
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
+            <input
+              type="text"
+              id="desc"
+              required
+              class="w-full p-3 bg-slate-50 rounded-xl border ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+              placeholder="e.g. Lunch" />
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Amount ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                id="amount"
+                required
+                class="w-full p-3 bg-slate-50 rounded-xl border ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                placeholder="0.00" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Category</label>
+              <select
+                id="category"
+                class="w-full p-3 bg-slate-50 rounded-xl border ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none">
+                <option value="Accommodation">Accommodation</option>
+                <option value="Food & Groceries">Food & Groceries</option>
+                <option value="Transportation">Transportation</option>
+                <option value="Utilities & Internet">Utilities & Internet</option>
+                <option value="Leisure & Personal">Leisure & Personal</option>
+                <option value="Tuition & Fees">Tuition & Fees</option>
+              </select>
+            </div>
+          </div>
+          <button
+            type="submit"
+            id="saveButton"
+            class="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold mt-4 shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-colors">
+            Save Transaction
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Monthly Budget Modal -->
+    <div
+      id="budgetModal"
+      class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+      <div class="bg-white rounded-3xl w-full max-w-sm p-8 shadow-2xl scale-in">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-bold">Set Monthly Budget</h2>
+          <button onclick="toggleBudgetModal()" class="text-slate-400 hover:text-slate-600">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <form id="budgetForm" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Budget Amount ($)</label>
+            <input
+              type="number"
+              step="1"
+              min="0"
+              id="newBudgetAmount"
+              required
+              class="w-full p-3 bg-slate-50 rounded-xl border ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+              placeholder="4500" />
+          </div>
+          <button
+            type="submit"
+            class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold mt-4 shadow-lg hover:bg-indigo-700 transition-colors">
+            Update Budget
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div
+      id="deleteModal"
+      class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+      <div class="bg-white rounded-3xl w-full max-w-sm p-8 shadow-2xl scale-in text-center">
+        <div class="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
+          <i class="fas fa-trash-alt text-2xl"></i>
+        </div>
+        <h2 class="text-xl font-bold text-slate-800 mb-2">Delete Transaction?</h2>
+        <p class="text-slate-500 text-sm mb-6">
+          This action cannot be undone. Are you sure you want to remove this expense?
+        </p>
+        <div class="flex gap-3">
+          <button
+            onclick="closeDeleteModal()"
+            class="flex-1 px-4 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl transition-all hover:bg-slate-200">
+            Cancel
+          </button>
+          <button
+            id="confirmDeleteBtn"
+            class="flex-1 px-4 py-3 bg-rose-600 text-white font-bold rounded-xl transition-all hover:bg-rose-700 shadow-lg shadow-rose-100">
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="./js/dashboard.js"></script>
+  </body>
+</html>
