@@ -1,10 +1,10 @@
-const apiKey = ""; // Provided at runtime
+const apiKey = "gen-lang-client-0709470700"; // Provided at runtime
 const CATEGORIES_CONFIG = {
   Accommodation: { color: "bg-indigo-600" },
   "Food & Groceries": { color: "bg-amber-500" },
   Transportation: { color: "bg-emerald-500" },
   "Utilities & Internet": { color: "bg-cyan-500" },
-  "Personal": { color: "bg-rose-500" },
+  Personal: { color: "bg-rose-500" },
   "Tuition Fees": { color: "bg-purple-600" },
 };
 
@@ -218,8 +218,9 @@ async function handleAIScan(input) {
       },
     };
 
+    // Change this line inside the handleAIScan function:
     const result = await apiCallWithRetry(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -289,3 +290,97 @@ window.onload = function () {
     toggleBudgetModal();
   });
 };
+
+async function handleAIScan(input) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  const loader = document.getElementById("aiLoader");
+  const errorMsg = document.getElementById("aiErrorMessage");
+
+  loader.classList.remove("hidden");
+  errorMsg.classList.add("hidden");
+
+  try {
+    const reader = new FileReader();
+    const base64Promise = new Promise((resolve, reject) => {
+      reader.onload = () => resolve(reader.result.split(",")[1]);
+      reader.onerror = reject;
+    });
+    reader.readAsDataURL(file);
+    const base64Data = await base64Promise;
+
+    // Use gemini-1.5-flash for broader stability and faster processing
+    const modelId = "gemini-1.5-flash";
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+
+    const payload = {
+      contents: [
+        {
+          parts: [
+            {
+              text: `Analyze this receipt image. 
+              1. Identify the total amount (as a number).
+              2. Create a short description.
+              3. Choose the best category from: ${Object.keys(CATEGORIES_CONFIG).join(", ")}.
+              
+              Return ONLY a JSON object. No markdown, no explanation.
+              Format: {"amount": number, "description": "string", "category": "string"}`,
+            },
+            {
+              inlineData: {
+                mimeType: file.type,
+                data: base64Data,
+              },
+            },
+          ],
+        },
+      ],
+      generationConfig: {
+        responseMimeType: "application/json",
+      },
+    };
+
+    const result = await apiCallWithRetry(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    // Check for valid candidates in the response
+    const candidateText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!candidateText) {
+      throw new Error("The AI could not read the receipt. Please try a clearer photo.");
+    }
+
+    // Clean JSON: Remove markdown backticks if present
+    const cleanJson = candidateText
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
+    const data = JSON.parse(cleanJson);
+
+    // Update UI fields
+    if (data.description) document.getElementById("desc").value = data.description;
+    if (data.amount) document.getElementById("amount").value = data.amount;
+
+    // Category matching logic
+    if (data.category && CATEGORIES_CONFIG[data.category]) {
+      document.getElementById("category").value = data.category;
+    } else if (data.category) {
+      const matchedCat = Object.keys(CATEGORIES_CONFIG).find(
+        (cat) => cat.toLowerCase() === data.category.toLowerCase(),
+      );
+      if (matchedCat) document.getElementById("category").value = matchedCat;
+    }
+  } catch (err) {
+    console.error("AI Scan Error:", err);
+    // User-friendly error display
+    errorMsg.innerText = `Scan failed: ${err.message}. Please check your internet or enter manually.`;
+    errorMsg.classList.remove("hidden");
+  } finally {
+    loader.classList.add("hidden");
+    input.value = "";
+  }
+}
